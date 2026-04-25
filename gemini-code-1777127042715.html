@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Routine Adventure</title>
+    <style>
+        :root {
+            --sky-blue: #87CEEB;
+            --road-grey: #444;
+            --grass-green: #7cfc00;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: #f0f0f0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+
+        #game-container {
+            position: relative;
+            width: 800px;
+            height: 400px;
+            background: var(--sky-blue);
+            border: 5px solid #333;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        /* Scenery */
+        .grass { position: absolute; bottom: 0; width: 100%; height: 100px; background: var(--grass-green); }
+        .road { position: absolute; bottom: 20px; width: 100%; height: 60px; background: var(--road-grey); }
+        .road::after { content: ""; position: absolute; top: 28px; width: 100%; height: 4px; border-top: 4px dashed white; }
+
+        /* Sprites */
+        #car {
+            position: absolute;
+            bottom: 25px;
+            left: 50px;
+            width: 80px;
+            transition: left 2s linear;
+            z-index: 10;
+        }
+
+        #monster {
+            position: absolute;
+            bottom: 30px;
+            right: -150px;
+            width: 100px;
+            transition: right 1s ease-in-out;
+            z-index: 11;
+        }
+
+        /* Thought Bubble */
+        #bubble {
+            position: absolute;
+            bottom: 140px;
+            right: 50px;
+            width: 250px;
+            padding: 20px;
+            background: white;
+            border-radius: 30px;
+            border: 3px solid #333;
+            display: none;
+            font-weight: bold;
+            text-align: center;
+            z-index: 20;
+        }
+        #bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -20px;
+            right: 50px;
+            border-width: 20px 20px 0;
+            border-style: solid;
+            border-color: white transparent;
+        }
+
+        /* Controls */
+        #controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            padding: 15px 30px;
+            font-size: 18px;
+            cursor: pointer;
+            border-radius: 5px;
+            border: none;
+            background: #2ecc71;
+            color: white;
+            transition: 0.3s;
+        }
+
+        button:disabled { background: #95a5a6; cursor: not-allowed; }
+        button:hover:not(:disabled) { background: #27ae60; }
+
+        #mic-status {
+            margin-top: 10px;
+            font-weight: bold;
+            color: #e74c3c;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🚗 Daily Routine Speaking Quest</h1>
+
+    <div id="game-container">
+        <div class="grass"></div>
+        <div class="road"></div>
+        
+        <div id="car">
+            <svg viewBox="0 0 100 60">
+                <rect x="10" y="20" width="80" height="25" fill="red" rx="5"/>
+                <rect x="20" y="5" width="50" height="20" fill="deepskyblue" rx="5"/>
+                <circle cx="25" cy="45" r="8" fill="black"/>
+                <circle cx="75" cy="45" r="8" fill="black"/>
+            </svg>
+        </div>
+
+        <div id="monster">
+            <svg viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="40" fill="purple"/>
+                <circle cx="35" cy="40" r="8" fill="white"/>
+                <circle cx="65" cy="40" r="8" fill="white"/>
+                <circle cx="35" cy="40" r="3" fill="black"/>
+                <circle cx="65" cy="40" r="3" fill="black"/>
+                <path d="M 30 70 Q 50 85 70 70" stroke="white" stroke-width="3" fill="none"/>
+            </svg>
+        </div>
+
+        <div id="bubble"></div>
+    </div>
+
+    <div id="mic-status">Press "Start Engine" to begin!</div>
+
+    <div id="controls">
+        <button id="start-btn">Start Engine</button>
+        <button id="mic-btn" disabled>Speak Answer 🎤</button>
+    </div>
+
+    <script>
+        const questions = [
+            "What time do you wake up every day?",
+            "What do you do after you wake up?",
+            "Do you eat breakfast? What do you usually eat?",
+            "How do you go to school?",
+            "What is your favourite subject at school? Why?",
+            "What do you do during recess?",
+            "What time do you go home from school?",
+            "What do you do after school?",
+            "Do you help your family at home? What do you do?",
+            "What do you do before you go to bed?"
+        ];
+
+        let currentStep = 0;
+        const car = document.getElementById('car');
+        const monster = document.getElementById('monster');
+        const bubble = document.getElementById('bubble');
+        const micBtn = document.getElementById('mic-btn');
+        const startBtn = document.getElementById('start-btn');
+        const micStatus = document.getElementById('mic-status');
+
+        // Speech Recognition Setup
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = SpeechRecognition ? new SpeechRecognition() : null;
+
+        if (recognition) {
+            recognition.continuous = false;
+            recognition.lang = 'en-US';
+            recognition.interimResults = false;
+
+            recognition.onresult = (event) => {
+                const result = event.results[0][0].transcript;
+                micStatus.innerText = `You said: "${result}" - Great job! Moving on...`;
+                micStatus.style.color = "green";
+                proceed();
+            };
+
+            recognition.onerror = () => {
+                micStatus.innerText = "Try again! I didn't hear you clearly.";
+            };
+        }
+
+        startBtn.addEventListener('click', () => {
+            startBtn.disabled = true;
+            nextEncounter();
+        });
+
+        micBtn.addEventListener('click', () => {
+            if (!recognition) {
+                alert("Speech recognition not supported in this browser. Please use Chrome.");
+                proceed(); // Fallback for testing
+                return;
+            }
+            micStatus.innerText = "Listening...";
+            recognition.start();
+        });
+
+        function nextEncounter() {
+            if (currentStep >= questions.length) {
+                bubble.innerText = "You finished the journey! Well done!";
+                bubble.style.display = "block";
+                return;
+            }
+
+            micStatus.innerText = "Driving...";
+            micStatus.style.color = "#444";
+            micBtn.disabled = true;
+
+            // Move car to middle, bring monster in
+            car.style.left = "300px";
+            setTimeout(() => {
+                monster.style.right = "50px";
+                setTimeout(() => {
+                    bubble.innerText = questions[currentStep];
+                    bubble.style.display = "block";
+                    micBtn.disabled = false;
+                    micStatus.innerText = "Monster is waiting! Click the mic to answer.";
+                }, 1000);
+            }, 1000);
+        }
+
+        function proceed() {
+            micBtn.disabled = true;
+            bubble.style.display = "none";
+            monster.style.right = "-150px"; // Monster leaves
+            
+            // Car drives off screen and resets
+            car.style.left = "850px";
+            
+            setTimeout(() => {
+                car.style.transition = "none";
+                car.style.left = "-100px";
+                setTimeout(() => {
+                    car.style.transition = "left 2s linear";
+                    currentStep++;
+                    nextEncounter();
+                }, 100);
+            }, 2000);
+        }
+    </script>
+</body>
+</html>
